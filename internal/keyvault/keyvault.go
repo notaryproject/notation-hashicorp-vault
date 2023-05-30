@@ -22,7 +22,7 @@ type VaultClientWrapper struct {
 
 func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 	// read addr and token from environment variables
-	VAULTADDR = os.Getenv("VAULT_ADDR")
+	vaultAddr := os.Getenv("VAULT_ADDR")
 	if len(VAULTADDR) < 1 {
 		return nil, errors.New("failed to load vault address")
 	}
