@@ -27,7 +27,7 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 		return nil, errors.New("failed to load vault address")
 	}
 
-	VAULTTOKEN = os.Getenv("VAULT_TOKEN")
+	vaultToken := os.Getenv("VAULT_TOKEN")
 	if len(VAULTTOKEN) < 1 {
 		log.Fatal("Error loading vault token")
 	}
