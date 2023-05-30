@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-var VAULTADDR, VAULTTOKEN string
-
-var ParseCertificates = crypto.ParseCertificates
 
 type VaultClientWrapper struct {
 	vaultClient *vault.Client
