@@ -80,7 +80,10 @@ func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData s
 		return nil, err
 	}
 
-	signature := resp.Data["signature"].(string)
+	signature, ok := resp.Data["signature"].(string)
+	if !ok {
+	    return nil, errors.New("failed to parse signature from TransitSign response")
+	}
 	items := strings.Split(signature, ":")
 	sigBytes, err := base64.StdEncoding.DecodeString(items[2])
 	if err != nil {
