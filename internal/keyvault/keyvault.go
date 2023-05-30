@@ -63,8 +63,7 @@ func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.
 	    return nil, errors.New("failed to parse certificate from KV secrets engine")
 	}
 	certBytes := []byte(certString)
-	certs, err := ParseCertificates(certBytes)
-	return certs, nil
+	return crypto.ParseCertificates(certBytes)
 }
 
 func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData string, signAlgorithm string) ([]byte, error) {
