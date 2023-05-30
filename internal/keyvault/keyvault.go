@@ -59,7 +59,10 @@ func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.
 		return nil, err
 	}
 	//fmt.Println("Successfully got the cert chain from vault")
-	certString := secret.Data["data"].(map[string]interface{})["certificate"].(string)
+        certString, ok := secret.Data.Data["certificate"].(string)
+	if !ok {
+	    return nil, errors.New("failed to parse certificate from KV secrets engine")
+	}
 	certBytes := []byte(certString)
 	certs, err := ParseCertificates(certBytes)
 	return certs, nil
