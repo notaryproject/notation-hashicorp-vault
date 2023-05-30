@@ -70,7 +70,6 @@ func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData s
 	resp, err := vw.vaultClient.Secrets.TransitSign(ctx, vw.keyID, schema.TransitSignRequest{
 		Input:               encodedData,
 		MarshalingAlgorithm: "asn1",
-		KeyVersion:          0,
 		Prehashed:           true,
 		SaltLength:          "hash",
 		SignatureAlgorithm:  signAlgorithm,
