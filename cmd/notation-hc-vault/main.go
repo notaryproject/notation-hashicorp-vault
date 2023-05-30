@@ -44,5 +44,14 @@ func main() {
 }
 
 func help() {
-	fmt.Print("Help not implemented yet.")
+	fmt.Printf(`notation-hc-vault - Notation Hashicorp Vault plugin
+Usage:
+  notation-hc-vault <command>
+Version:
+  %s
+Commands:
+  describe-key         Hashicorp vault key description
+  generate-signature   Sign artifacts with keys in Hashicorp Vault
+  get-plugin-metadata  Get plugin metadata
+`, version.GetVersion())
 }
