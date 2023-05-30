@@ -10,7 +10,7 @@ func runGetMetadata() *proto.GetMetadataResponse {
 		Name:                      "hc-vault",
 		Description:               "Sign artifacts with keys in HashiCorp Vault",
 		Version:                   version.GetVersion(),
-		URL:                       "https://github.com/OliverShang/notation-hc-vault",
+		URL:                       "https://github.com/notaryproject/notation-hashicorp-vault",
 		SupportedContractVersions: []string{proto.ContractVersion},
 		Capabilities:              []proto.Capability{proto.CapabilitySignatureGenerator},
 	}
