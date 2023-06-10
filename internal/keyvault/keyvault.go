@@ -5,12 +5,11 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	"github.com/hashicorp/vault-client-go"
-	"github.com/hashicorp/vault-client-go/schema"
+	"fmt"
+	vault "github.com/hashicorp/vault/api"
 	"github.com/notaryproject/notation-hashicorp-vault/internal/crypto"
 	"os"
 	"strings"
-	"time"
 )
 
 type VaultClientWrapper struct {
@@ -32,18 +31,22 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 	}
 
 	// prepare a client with the given base address
-	client, err := vault.New(
-		vault.WithAddress(vaultAddr),
-		vault.WithRequestTimeout(30*time.Second),
-	)
+	client, err := vault.NewClient(&vault.Config{
+		Address: vaultAddr,
+	})
+	fmt.Println(client)
+	//client, err := vault.New(
+	//	vault.WithAddress(vaultAddr),
+	//	vault.WithRequestTimeout(30*time.Second),
+	//)
 	if err != nil {
 		return nil, err
 	}
 
 	// authenticate with a root token (insecure)
-	if err := client.SetToken(vaultToken); err != nil {
-		return nil, err
-	}
+	//if err := client.SetToken(vaultToken); err != nil {
+	//	return nil, err
+	//}
 
 	return &VaultClientWrapper{
 		vaultClient: client,
@@ -53,11 +56,11 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 
 func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.Certificate, error) {
 	// read a certChain
-	secret, err := vw.vaultClient.Secrets.KvV2Read(ctx, vw.keyID)
+	secret, err := vw.vaultClient.KVv2("secret").Get(ctx, vw.keyID)
 	if err != nil {
 		return nil, err
 	}
-	certString, ok := secret.Data.Data["certificate"].(string)
+	certString, ok := secret.Data["certificate"].(string)
 	if !ok {
 		return nil, errors.New("failed to parse certificate from KV secrets engine")
 	}
@@ -67,13 +70,22 @@ func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.
 
 func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData string, signAlgorithm string) ([]byte, error) {
 	// sign with transit SE
-	resp, err := vw.vaultClient.Secrets.TransitSign(ctx, vw.keyID, schema.TransitSignRequest{
-		Input:               encodedData,
-		MarshalingAlgorithm: "asn1",
-		Prehashed:           true,
-		SaltLength:          "hash",
-		SignatureAlgorithm:  signAlgorithm,
-	})
+	transitSignReq := map[string]interface{}{
+		"input":                encodedData,
+		"marshaling_algorithm": "asn1",
+		"prehashed":            true,
+		"salt_length":          "hash",
+		"signature_algorithm":  signAlgorithm,
+	}
+	//resp, err := vw.vaultClient.Secrets.TransitSign(ctx, vw.keyID, schema.TransitSignRequest{
+	//	Input:               encodedData,
+	//	MarshalingAlgorithm: "asn1",
+	//	Prehashed:           true,
+	//	SaltLength:          "hash",
+	//	SignatureAlgorithm:  signAlgorithm,
+	//})
+	path := "transit/sign/" + vw.keyID
+	resp, err := vw.vaultClient.Logical().WriteWithContext(ctx, path, transitSignReq)
 	if err != nil {
 		return nil, err
 	}

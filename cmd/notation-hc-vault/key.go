@@ -27,7 +27,6 @@ func runDescribeKey(ctx context.Context, input io.Reader) (*proto.DescribeKeyRes
 	if err != nil {
 		return nil, err
 	}
-
 	return &proto.DescribeKeyResponse{
 		KeyID:   req.KeyID,
 		KeySpec: keySpec,

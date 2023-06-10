@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/notaryproject/notation-hashicorp-vault/internal/version"
 	"os"
 
 	"github.com/notaryproject/notation-go/plugin/proto"
