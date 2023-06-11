@@ -24,11 +24,6 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 		return nil, errors.New("failed to load vault address")
 	}
 
-	vaultToken := os.Getenv("VAULT_TOKEN")
-	if len(vaultToken) < 1 {
-		return nil, errors.New("Error loading vault token")
-	}
-
 	// prepare a client with the given base address
 	client, err := vault.NewClient(&vault.Config{
 		Address: vaultAddr,
