@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/notaryproject/notation-hashicorp-vault/internal/crypto"
 	"os"
@@ -34,19 +33,9 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 	client, err := vault.NewClient(&vault.Config{
 		Address: vaultAddr,
 	})
-	fmt.Println(client)
-	//client, err := vault.New(
-	//	vault.WithAddress(vaultAddr),
-	//	vault.WithRequestTimeout(30*time.Second),
-	//)
 	if err != nil {
 		return nil, err
 	}
-
-	// authenticate with a root token (insecure)
-	//if err := client.SetToken(vaultToken); err != nil {
-	//	return nil, err
-	//}
 
 	return &VaultClientWrapper{
 		vaultClient: client,
@@ -77,13 +66,6 @@ func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData s
 		"salt_length":          "hash",
 		"signature_algorithm":  signAlgorithm,
 	}
-	//resp, err := vw.vaultClient.Secrets.TransitSign(ctx, vw.keyID, schema.TransitSignRequest{
-	//	Input:               encodedData,
-	//	MarshalingAlgorithm: "asn1",
-	//	Prehashed:           true,
-	//	SaltLength:          "hash",
-	//	SignatureAlgorithm:  signAlgorithm,
-	//})
 	path := "transit/sign/" + vw.keyID
 	resp, err := vw.vaultClient.Logical().WriteWithContext(ctx, path, transitSignReq)
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/notaryproject/notation-hashicorp-vault/internal/version"
 	"os"
@@ -32,15 +33,35 @@ func main() {
 	// output the response
 	if err == nil {
 		// ignore the error because the response only contains valid JSON field.
-		jsonResp, _ := json.Marshal(resp)
+		jsonResp, err2 := json.Marshal(resp)
+		if err2 != nil {
+			data, _ := json.Marshal(wrapError(err2))
+			os.Stderr.Write(data)
+			os.Exit(1)
+		}
 		_, err = os.Stdout.Write(jsonResp)
 	}
 
 	// output the error
 	if err != nil {
-		data, _ := json.Marshal(err)
+		data, _ := json.Marshal(wrapError(err))
 		os.Stderr.Write(data)
 		os.Exit(1)
+	}
+}
+
+func wrapError(err error) *proto.RequestError {
+	// already wrapped
+	var nerr *proto.RequestError
+	if errors.As(err, &nerr) {
+		return nerr
+	}
+
+	// default error code
+	code := proto.ErrorCodeGeneric
+	return &proto.RequestError{
+		Code: code,
+		Err:  err,
 	}
 }
 
