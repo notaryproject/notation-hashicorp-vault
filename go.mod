@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/hashicorp/vault/api v1.9.2
-	github.com/notaryproject/notation-core-go v1.0.0-rc.3
-	github.com/notaryproject/notation-go v1.0.0-rc.5
+	github.com/notaryproject/notation-core-go v1.0.0-rc.4
+	github.com/notaryproject/notation-go v1.0.0-rc.6
 )
 
 require (
