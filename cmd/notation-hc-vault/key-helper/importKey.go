@@ -18,7 +18,7 @@ import (
 	"os"
 )
 
-var vaultAddr, VAULTTOKEN string
+var vaultAddr string
 
 func init() {
 	rootCmd.AddCommand(importKeyCmd)
