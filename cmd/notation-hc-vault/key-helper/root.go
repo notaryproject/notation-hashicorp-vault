@@ -13,7 +13,6 @@ var rootCmd = &cobra.Command{
    
 import key to Vault Transit secrets engine and certificates to Vault KV secrets engine`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("ah")
 	},
 }
 

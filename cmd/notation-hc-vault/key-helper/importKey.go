@@ -10,17 +10,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/google/tink/go/kwp/subtle"
-	"github.com/hashicorp/vault-client-go"
-	"github.com/hashicorp/vault-client-go/schema"
+	vault "github.com/hashicorp/vault/api"
 	notationx509 "github.com/notaryproject/notation-core-go/x509"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 )
 
-var VAULTADDR, VAULTTOKEN string
+var vaultAddr, VAULTTOKEN string
 
 func init() {
 	rootCmd.AddCommand(importKeyCmd)
@@ -75,24 +73,16 @@ import key to Vault Transit secrets engine and certificates to Vault KV secrets 
 
 func getVaultClient(ctx context.Context) (*vault.Client, error) {
 	// read addr and token from environment variables
-	VAULTADDR = os.Getenv("VAULT_ADDR")
-	if len(VAULTADDR) < 1 {
+	vaultAddr = os.Getenv("VAULT_ADDR")
+	if len(vaultAddr) < 1 {
 		log.Fatal("Error loading vault address")
 	}
 
-	VAULTTOKEN = os.Getenv("VAULT_TOKEN")
-	if len(VAULTTOKEN) < 1 {
-		log.Fatal("Error loading vault token")
-	}
 	// prepare a client with the given base address
-	vaultClient, err := vault.New(
-		vault.WithAddress(VAULTADDR),
-		vault.WithRequestTimeout(30*time.Second),
-	)
+	vaultClient, err := vault.NewClient(&vault.Config{
+		Address: vaultAddr,
+	})
 	if err != nil {
-		return nil, err
-	}
-	if err := vaultClient.SetToken(VAULTTOKEN); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +91,8 @@ func getVaultClient(ctx context.Context) (*vault.Client, error) {
 
 func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
 	// get transit SE wrapping key
-	resp, err := client.Secrets.TransitReadWrappingKey(ctx)
+	path := "/transit/wrapping_key"
+	resp, err := client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return "", err
 	}
@@ -154,19 +145,21 @@ func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
 }
 
 func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string) error {
+	path := fmt.Sprintf("/transit/keys/%s/import", keyName)
 
-	req := schema.TransitImportKeyRequest{
-		AllowPlaintextBackup: false,
-		AllowRotation:        false,
-		AutoRotatePeriod:     0,
-		Ciphertext:           ciphertext,
-		Context:              "",
-		Derived:              false,
-		Exportable:           false,
-		HashFunction:         "SHA256",
-		Type:                 "rsa-2048",
+	req := map[string]interface{}{
+		"allow_plaintext_backup": false,
+		"allow_rotation":         false,
+		"auto_rotate_period":     0,
+		"ciphertext":             ciphertext,
+		"context":                "",
+		"derived":                false,
+		"exportable":             false,
+		"hashFunction":           "SHA256",
+		"type":                   "rsa-2048",
+		"name":                   "keyName",
 	}
-	_, err := client.Secrets.TransitImportKey(ctx, keyName, req)
+	_, err := client.Logical().WriteWithContext(ctx, path, req)
 	return err
 }
 
@@ -178,11 +171,6 @@ func importCertToKV(ctx context.Context, client *vault.Client, certPath string, 
 	bytes, err := ioutil.ReadAll(certFile)
 	data := make(map[string]interface{})
 	data["certificate"] = string(bytes)
-	req := schema.KVv2WriteRequest{
-		Data:    data,
-		Options: nil,
-		Version: 0,
-	}
-	_, err = client.Secrets.KVv2Write(ctx, keyName, req)
+	client.KVv2("secret").Put(ctx, keyName, data)
 	return err
 }
