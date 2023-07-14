@@ -1,4 +1,4 @@
-package key_helper
+package main
 
 import (
 	"context"
@@ -8,85 +8,80 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
+	"os"
+
 	"github.com/google/tink/go/kwp/subtle"
 	vault "github.com/hashicorp/vault/api"
 	notationx509 "github.com/notaryproject/notation-core-go/x509"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"log"
-	"os"
 )
 
 var vaultAddr string
 
-func init() {
-	rootCmd.AddCommand(importKeyCmd)
-	importKeyCmd.PersistentFlags().String("key_path", "", "absolute path to the private key file")
-	importKeyCmd.PersistentFlags().String("cert_path", "", "absolute path to the certificate chain file")
-	importKeyCmd.PersistentFlags().String("key_name", "", "name of the key")
-
-}
-
-var importKeyCmd = &cobra.Command{
-	Use:   "import",
-	Short: "import - a simple CLI to import key and certificates to HashiCorp Vault",
-	Long: `import - a simple CLI to import key and certificates to HashiCorp Vault
-   
-import key to Vault Transit secrets engine and certificates to Vault KV secrets engine`,
-	Run: func(cmd *cobra.Command, args []string) {
-		ctx := context.Background()
-		fmt.Println("Import key start")
-		keyPath, err := cmd.Flags().GetString("key_path")
-		if err != nil {
-			fmt.Println(err)
-		}
-		certPath, err := cmd.Flags().GetString("cert_path")
-		if err != nil {
-			fmt.Println(err)
-		}
-		keyName, err := cmd.Flags().GetString("key_name")
-		if err != nil {
-			fmt.Println(err)
-		}
-		vaultClient, err := getVaultClient(ctx)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println("Successfully got vault client")
-		wrappingKey, err := getWrappingKey(ctx, vaultClient)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println("Successfully got wrapping key")
-		ciphertext, err := wrapPrivateKey(wrappingKey, keyPath)
-		if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName); err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println("Successfully imported key to transit")
-		if err := importCertToKV(ctx, vaultClient, certPath, keyName); err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println("Successfully imported cert to kv")
-	},
+func importKeyCommand() *cobra.Command {
+	importKeyCmd := &cobra.Command{
+		Use:   "import --key_path <path_to_private key file> --cert_path <path_to__certificate_chain_file> --key_name <HashiCorp_Vault_key_name>",
+		Short: "import private key and certificates to HashiCorp Vault",
+		Long:  "import private key to Vault Transit secrets engine and certificates to Vault KV secrets engine",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			fmt.Println("Import key start")
+			keyPath, err := cmd.Flags().GetString("key_path")
+			if err != nil {
+				return err
+			}
+			certPath, err := cmd.Flags().GetString("cert_path")
+			if err != nil {
+				return err
+			}
+			keyName, err := cmd.Flags().GetString("key_name")
+			if err != nil {
+				return err
+			}
+			vaultClient, err := getVaultClient(ctx)
+			if err != nil {
+				return err
+			}
+			fmt.Println("Successfully got vault client")
+			wrappingKey, err := getWrappingKey(ctx, vaultClient)
+			if err != nil {
+				return err
+			}
+			fmt.Println("Successfully got wrapping key")
+			ciphertext, err := wrapPrivateKey(wrappingKey, keyPath)
+			if err != nil {
+				return err
+			}
+			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName); err != nil {
+				return err
+			}
+			fmt.Println("Successfully imported key to transit")
+			if err := importCertToKV(ctx, vaultClient, certPath, keyName); err != nil {
+				return err
+			}
+			fmt.Println("Successfully imported cert to kv")
+			return nil
+		},
+	}
+	importKeyCmd.Flags().String("key_path", "", "absolute path to the private key file")
+	importKeyCmd.Flags().String("cert_path", "", "absolute path to the certificate chain file")
+	importKeyCmd.Flags().String("key_name", "", "name of the key")
+	return importKeyCmd
 }
 
 func getVaultClient(ctx context.Context) (*vault.Client, error) {
 	// read addr and token from environment variables
 	vaultAddr = os.Getenv("VAULT_ADDR")
 	if len(vaultAddr) < 1 {
-		log.Fatal("Error loading vault address")
+		return nil, errors.New("error loading vault address")
 	}
-
 	// prepare a client with the given base address
-	vaultClient, err := vault.NewClient(&vault.Config{
+	return vault.NewClient(&vault.Config{
 		Address: vaultAddr,
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return vaultClient, nil
 }
 
 func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
@@ -96,7 +91,10 @@ func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	key := resp.Data["public_key"].(string)
+	key, ok := resp.Data["public_key"].(string)
+	if !ok {
+		return "", errors.New("failed to get public key from resp.Data")
+	}
 	return key, nil
 }
 
@@ -127,7 +125,6 @@ func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	wrappedAESKey, err := rsa.EncryptOAEP(
 		sha256.New(),
 		rand.Reader,
@@ -140,13 +137,11 @@ func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
 	}
 	combinedCiphertext := append(wrappedAESKey, wrappedTargetKey...)
 	base64Ciphertext := base64.StdEncoding.EncodeToString(combinedCiphertext)
-
 	return base64Ciphertext, nil
 }
 
 func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string) error {
 	path := fmt.Sprintf("/transit/keys/%s/import", keyName)
-
 	req := map[string]interface{}{
 		"allow_plaintext_backup": false,
 		"allow_rotation":         false,
@@ -166,11 +161,14 @@ func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext st
 func importCertToKV(ctx context.Context, client *vault.Client, certPath string, keyName string) error {
 	certFile, err := os.Open(certPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	bytes, err := ioutil.ReadAll(certFile)
+	bytes, err := io.ReadAll(certFile)
+	if err != nil {
+		return err
+	}
 	data := make(map[string]interface{})
 	data["certificate"] = string(bytes)
-	client.KVv2("secret").Put(ctx, keyName, data)
+	_, err = client.KVv2("secret").Put(ctx, keyName, data)
 	return err
 }
