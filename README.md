@@ -6,7 +6,7 @@ HashiCorp Vault signing plugin for [Notation](https://notaryproject.dev/)
 2. Install the `notation-hc-vault` plugin to the notation path specified by [notation plugin spec](https://github.com/notaryproject/notaryproject/blob/main/specs/plugin-extensibility.md#installation). On unix, the path is `$XDG_CONFIG_HOME/notation/plugins/hc-vault/notation-hc-vault`.
 3. `key-helper` is a standalone helper CLI used to configure Hashicorp Vault.
 
-## Install and Configure Hshicorp Vault Server
+## Install and Configure Hashicorp Vault Server
 1. [Install Hashicorp Vault](https://developer.hashicorp.com/vault/downloads)
 2. Create a Vault config file under your work directory. A minimal working example is shown below, more details about config can be found [here](https://developer.hashicorp.com/vault/tutorials/operations/configure-vault#configuration-files):
     ```bash
