@@ -1,5 +1,5 @@
-# notation-hc-vault
-HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
+# notation-hashicorp-vault
+HashiCorp Vault signing plugin for [Notation](https://notaryproject.dev/)
 
 ## Setup
 1. There are two binaries in the release: `key-helper` and `notation-hc-vault`.
@@ -8,7 +8,7 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
 
 ## Install and Configure Hshicorp Vault Server
 1. [Install Hashicorp Vault](https://developer.hashicorp.com/vault/downloads)
-2. Create a vault config file under your work directory. A minimal working example is shown below, more details about config can be found [here](https://developer.hashicorp.com/vault/tutorials/operations/configure-vault#configuration-files)):
+2. Create a Vault config file under your work directory. A minimal working example is shown below, more details about config can be found [here](https://developer.hashicorp.com/vault/tutorials/operations/configure-vault#configuration-files):
     ```bash
     $ cat > vault-server.hcl <<EOF
     disable_mlock = true
@@ -19,7 +19,7 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
     tls_disable = "true"
     }
 
-    storage "file" {
+    storage "raft" {
     path = "/tmp/vault-data"
     }
     EOF
@@ -27,17 +27,16 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
 3. Start a prod server 
     ```bash 
     vault server -config vault-server.hcl
-    ```
-   Note: when this process is stopped, the vault will be sealed. To unseal the vault, you need to run this command again.
+    ```   
 4. At this point, open `127.0.0.1:8200` in your browser to see the webpage of your Hashicorp Vault server.
-5. Initialize the vault (this is a one-time step, you do not need to do this step in the future). In this example, the root key is split into 3 key shares, and any two keys of the three will be sufficient to unseal the Vault, [see details](https://developer.hashicorp.com/vault/docs/concepts/seal).
+5. Initialize Vault (this is a one-time step, you do not need to do this step in the future). In this example, the root key is split into 3 key shares, and any two keys of the three will be sufficient to unseal Vault, [see details](https://developer.hashicorp.com/vault/docs/concepts/seal).
     ![](./docs/root_keys.png)
     ![](./docs/download_keys.png)
     
-    ! IMPORTANT !: Remember to hit the `Download Keys` button before going forward. Both keys and the initial root token are downloaded. They are required to unseal the vault and sign in.
+    > **IMPORTANT** Remember to hit the `Download Keys` button before going forward. Both keys and the initial root token are downloaded. They are required to unseal Vault and sign in.
     
-    Unseal the Vault <br>
-    Enter two of the three keys generated previously to unseal the vault.
+    Unseal Vault <br>
+    Enter two of the three keys generated previously to unseal Vault.
     ![](./docs/unseal_vault.png)
     
     Sign in <br>
@@ -45,7 +44,8 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
     ![](./docs/sign_in.png)
     
     By now, the Hashicorp Vault production server is ready to be used.
-6. Configure the Vault client to talk to your server:
+    Note: when Vault process is stopped/closed, Vault will be sealed again.
+6. Configure Vault client to talk to your server:
     ```bash
     export VAULT_ADDR='http://127.0.0.1:8200'
     ```
@@ -53,8 +53,8 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
     ```bash
     export VAULT_TOKEN="hvs.**************"
     ```
-    These two environmental variables are ALWAYS required.
-7. If this is your first time setting up Hashicorp vault, you need to enable the Transit Secrets Engine and the KV Secrets Engine.
+    Note: Do not use the root token for production usage of Notation and Vault.
+7. If this is your first time setting up Hashicorp vault, you need to enable the Transit Secrets Engine and the KV Secrets Engine. (You could do this in Vault's web UI as well.)
     ```bash
     vault secrets enable transit
     vault secrets enable -path=secret kv-v2
@@ -62,7 +62,7 @@ HashiCorp Vault signing plugin for (Notation)[https://notaryproject.dev/]
     (Step 7 is a one-time setup, you do not need this step in the future.)
 
 ## Generate Private Key and Certificate Chain
-Now you have an empty Hashicorp vault. Let's put something in it.
+Now you have an empty Hashicorp Vault. Let's put something in it.
 
 A user can bring their own private key and certificate. As a quick start, this tutorial is using openssl to generate a private key and a certificate chain of length 2.
 1. Generate CA root certificate
@@ -84,7 +84,7 @@ A user can bring their own private key and certificate. As a quick start, this t
    ```bash
    cat leaf.crt ca.crt > certificate_chain.pem
    ```
-4. Import the certificate chain and private key into the Hashicorp vault using `key-helper`
+4. Import the certificate chain and private key into the Hashicorp Vault using `key-helper`
     ```bash
     ./key-helper import --cert_path "{path-to}/certificate_chain.pem" --key_name "myNotationTestKey" --key_path "{path-to}/leaf.key"
     ```
