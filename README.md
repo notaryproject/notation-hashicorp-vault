@@ -44,6 +44,7 @@ Hashicorp Vault signing plugin for [Notation](https://notaryproject.dev/)
     ![](./docs/sign_in.png)
     
     By now, the Hashicorp Vault production server is ready to be used.
+    
     Note: when Vault process is stopped/closed, Vault will be sealed again.
 6. Configure Vault client to talk to your server:
     ```bash
