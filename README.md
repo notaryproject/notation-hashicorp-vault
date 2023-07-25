@@ -1,5 +1,5 @@
 # notation-hashicorp-vault
-HashiCorp Vault signing plugin for [Notation](https://notaryproject.dev/)
+Hashicorp Vault signing plugin for [Notation](https://notaryproject.dev/)
 
 ## Setup
 1. There are two binaries in the release: `key-helper` and `notation-hc-vault`.
