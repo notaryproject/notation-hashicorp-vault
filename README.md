@@ -1,7 +1,15 @@
-# notation-hashicorp-vault
-Hashicorp Vault signing plugin for [Notation](https://notaryproject.dev/)
+# HashiCorp Vault plugin for Notation
+
+This repository contains the implementation of the HashiCorp Vault signing plugin for [Notation](https://notaryproject.dev/). This project is still in early development status.
+
+> **Note** The Notary Project documentation is available [here](https://notaryproject.dev/docs/). You can also find the Notary Project [README](https://github.com/notaryproject/.github/blob/main/README.md) to learn about the overall Notary Project.
+
+## Quick start
+
+This document demonstrates how to sign and verify an OCI artifact with HashiCorp Vault plugin for Notation. 
 
 ## Setup
+
 1. There are two binaries in the release: `key-helper` and `notation-hc-vault`.
 2. Install the `notation-hc-vault` plugin to the notation path specified by [notation plugin spec](https://github.com/notaryproject/notaryproject/blob/main/specs/plugin-extensibility.md#installation). On unix, the path is `$XDG_CONFIG_HOME/notation/plugins/hc-vault/notation-hc-vault`.
 3. `key-helper` is a standalone helper CLI used to configure Hashicorp Vault.
