@@ -112,7 +112,7 @@ Note: the `--id` should be identical to your `--key_name` in the previous step.
     ./notation cert add -t ca -s myStore "{path-to-ca-cert}/ca.crt"
     ```
     where `ca.crt` is the CA root cert generated in the previous step.
-2. Confgiure the trust policy.
+2. Configure the trust policy.
     ```bash 
     cat <<EOF > ./trustpolicy.json
     {
