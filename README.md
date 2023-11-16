@@ -140,3 +140,43 @@ Note: the `--id` should be identical to your `--key_name` in the previous step.
     ```bash
     ./notation verify <myRegistry>/<myRepo>@<digest> -v
     ```
+
+## Vault ACL Policy
+
+This signing plugin (`notation-hc-vault`) interacts with the following paths:
+
+ - read on `secret/data/:keyid`
+ - update on `transit/sign/:keyid`
+
+Thus the following ACL policy would be required for this plugin:
+
+```hcl
+path "secret/data/:keyid" {
+    capabilities = ["read"]
+}
+
+path "transit/sign/:keyid" {
+    capabilities = ["update"]
+}
+```
+
+This plugin's helper `key-helper` for rotating signed certificates
+interacts with the following paths:
+
+ - create or update on `secret/data/:keyid`
+ - update on `transit/keys/:keyid/import`
+
+Thus the following ACL policy would be required for this helper:
+
+```hcl
+path "secret/data/:keyid" {
+    capabilities = ["create", "update"]
+}
+
+path "transit/keys/:keyid/import" {
+    capabilities = ["update"]
+}
+```
+
+Refer to the Hashicorp Vault [tutorial for policies](https://developer.hashicorp.com/vault/tutorials/policies/policy-templating)
+for more information on using policies.
