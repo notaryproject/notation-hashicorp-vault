@@ -1,3 +1,12 @@
+# Org-Level Maintainers (in alphabetical order)
+# Pattern: [First Name] [Last Name] <[Email Address]> ([GitHub Handle])
+Justin Cormack <justin.cormack@docker.com> (@justincormack)
+Niaz Khan <niazfk@amazon.com> (@niazfk)
+Pritesh Bandi <priteshbandi@gmail.com> (@priteshbandi)
+Shiwei Zhang <shizh@microsoft.com> (@shizhMSFT)
+Steve Lasker <StevenLasker@hotmail.com> (@stevelasker)
+Toddy Mladenov <toddysm@gmail.com> (@toddysm)
+
 # Repo-Level Maintainers (in alphabetical order)
 # Note: This is for the notaryproject/notation-hashicorp-vault repo
 Alexander Scheel <alex.scheel@hashicorp.com> (@cipherboy)
