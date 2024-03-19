@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -55,7 +56,11 @@ func importKeyCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName); err != nil {
+			keyType, vaultRSAOAEPHashFunction, err := checkKeyType(keyPath)
+			if err != nil {
+				return err
+			}
+			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName, keyType, vaultRSAOAEPHashFunction); err != nil {
 				return err
 			}
 			fmt.Println("Successfully imported key to transit")
@@ -140,7 +145,89 @@ func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
 	return base64Ciphertext, nil
 }
 
-func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string) error {
+// Checks PrivateKey type and bitlength in EC, PKCS1 and PKCS8 containers
+func checkKeyType(keyPath string) (string, string, error) {
+	// Key types supported by Notary project specification
+	supportedRSAKeys := map[int]string{
+		2048: "rsa-2048",
+		3072: "rsa-3072",
+		4096: "rsa-4096",
+	}
+	supportedECDSAKeys := map[string]string{
+		"P-256": "ecdsa-p256",
+		"P-384": "ecdsa-p384",
+		"P-521": "ecdsa-p521",
+	}
+	digestAlgorithm := map[string]string{
+		"ecdsa-p256": "SHA256",
+		"ecdsa-p384": "SHA384",
+		"ecdsa-p521": "SHA512",
+		"rsa-2048":   "SHA256",
+		"rsa-3072":   "SHA384",
+		"rsa-4096":   "SHA512",
+	}
+
+	keyString, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", "", err
+	}
+	pemDecoded, _ := pem.Decode([]byte(keyString))
+
+	switch pemDecoded.Type {
+	case "EC PRIVATE KEY":
+		ecdsaPrivateKey, err := x509.ParseECPrivateKey(pemDecoded.Bytes)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		curveName := ecdsaPrivateKey.PublicKey.Curve.Params().Name
+
+		keyType, ok := supportedECDSAKeys[curveName]
+		if ok {
+			return keyType, "", nil
+		}
+		return "", "", fmt.Errorf("unsupported curve type: `%s`", curveName)
+
+	case "RSA PRIVATE KEY":
+		rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(pemDecoded.Bytes)
+		if err != nil {
+			return "", "", err
+		}
+		keyLength := rsaPrivateKey.N.BitLen()
+
+		keyType, ok := supportedRSAKeys[keyLength]
+		if ok {
+			return keyType, digestAlgorithm[keyType], nil
+		}
+		return "", "", fmt.Errorf("unsupported RSA keylength: %d", keyLength)
+
+	case "PRIVATE KEY":
+		key, _ := x509.ParsePKCS8PrivateKey(pemDecoded.Bytes)
+
+		switch key := key.(type) {
+		case *ecdsa.PrivateKey:
+			curveName := key.PublicKey.Curve.Params().Name
+			keyType, ok := supportedECDSAKeys[curveName]
+
+			if ok {
+				return keyType, digestAlgorithm[keyType], nil
+			}
+			return "", "", fmt.Errorf("unsupported curve type: `%s`", curveName)
+
+		case *rsa.PrivateKey:
+			keyLength := key.N.BitLen()
+			keyType, ok := supportedRSAKeys[keyLength]
+
+			if ok {
+				return keyType, digestAlgorithm[keyType], nil
+			}
+			return "", "", fmt.Errorf("unsupported RSA keylength: %d", keyLength)
+		}
+	}
+	return "", "", fmt.Errorf("your key is incompatible with Notary project signature specification")
+}
+
+func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string, keyType string, hashFunction string) error {
 	path := fmt.Sprintf("/transit/keys/%s/import", keyName)
 	req := map[string]interface{}{
 		"allow_plaintext_backup": false,
@@ -150,8 +237,8 @@ func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext st
 		"context":                "",
 		"derived":                false,
 		"exportable":             false,
-		"hashFunction":           "SHA256",
-		"type":                   "rsa-2048",
+		"hashFunction":           hashFunction,
+		"type":                   keyType,
 		"name":                   "keyName",
 	}
 	_, err := client.Logical().WriteWithContext(ctx, path, req)
