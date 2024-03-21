@@ -52,15 +52,11 @@ func importKeyCommand() *cobra.Command {
 				return err
 			}
 			fmt.Println("Successfully got wrapping key")
-			ciphertext, err := wrapPrivateKey(wrappingKey, keyPath)
+			ciphertext, keyType, err := wrapPrivateKey(wrappingKey, keyPath)
 			if err != nil {
 				return err
 			}
-			keyType, vaultRSAOAEPHashFunction, err := checkKeyType(keyPath)
-			if err != nil {
-				return err
-			}
-			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName, keyType, vaultRSAOAEPHashFunction); err != nil {
+			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName, keyType); err != nil {
 				return err
 			}
 			fmt.Println("Successfully imported key to transit")
@@ -103,50 +99,7 @@ func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
 	return key, nil
 }
 
-func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
-	keyBlock, _ := pem.Decode([]byte(wrappingKey))
-	privateKey, err := notationx509.ReadPrivateKeyFile(privateKeyPath)
-	if err != nil {
-		return "", err
-	}
-	pkcs8PrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	if err != nil {
-		return "", err
-	}
-	parsedKey, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
-	if err != nil {
-		return "", err
-	}
-	ephemeralAESKey := make([]byte, 32)
-	_, err = rand.Read(ephemeralAESKey)
-	if err != nil {
-		return "", err
-	}
-	wrapKWP, err := subtle.NewKWP(ephemeralAESKey)
-	if err != nil {
-		return "", err
-	}
-	wrappedTargetKey, err := wrapKWP.Wrap(pkcs8PrivateKey)
-	if err != nil {
-		return "", err
-	}
-	wrappedAESKey, err := rsa.EncryptOAEP(
-		sha256.New(),
-		rand.Reader,
-		parsedKey.(*rsa.PublicKey),
-		ephemeralAESKey,
-		[]byte{},
-	)
-	if err != nil {
-		return "", err
-	}
-	combinedCiphertext := append(wrappedAESKey, wrappedTargetKey...)
-	base64Ciphertext := base64.StdEncoding.EncodeToString(combinedCiphertext)
-	return base64Ciphertext, nil
-}
-
-// Checks PrivateKey type and bitlength in EC, PKCS1 and PKCS8 containers
-func checkKeyType(keyPath string) (string, string, error) {
+func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, string, error) {
 	// Key types supported by Notary project specification
 	supportedRSAKeys := map[int]string{
 		2048: "rsa-2048",
@@ -158,76 +111,69 @@ func checkKeyType(keyPath string) (string, string, error) {
 		"P-384": "ecdsa-p384",
 		"P-521": "ecdsa-p521",
 	}
-	digestAlgorithm := map[string]string{
-		"ecdsa-p256": "SHA256",
-		"ecdsa-p384": "SHA384",
-		"ecdsa-p521": "SHA512",
-		"rsa-2048":   "SHA256",
-		"rsa-3072":   "SHA384",
-		"rsa-4096":   "SHA512",
-	}
 
-	keyString, err := os.ReadFile(keyPath)
+	keyBlock, _ := pem.Decode([]byte(wrappingKey))
+	privateKey, err := notationx509.ReadPrivateKeyFile(privateKeyPath)
 	if err != nil {
 		return "", "", err
 	}
-	pemDecoded, _ := pem.Decode([]byte(keyString))
+	pkcs8PrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", "", err
+	}
 
-	switch pemDecoded.Type {
-	case "EC PRIVATE KEY":
-		ecdsaPrivateKey, err := x509.ParseECPrivateKey(pemDecoded.Bytes)
-		if err != nil {
-			fmt.Println(err)
-		}
+	var keyType string
+	var ok bool
+	switch key := privateKey.(type) {
+	case *ecdsa.PrivateKey:
+		curveName := key.PublicKey.Curve.Params().Name
+		keyType, ok = supportedECDSAKeys[curveName]
 
-		curveName := ecdsaPrivateKey.PublicKey.Curve.Params().Name
-
-		keyType, ok := supportedECDSAKeys[curveName]
-		if ok {
-			return keyType, "", nil
-		}
-		return "", "", fmt.Errorf("unsupported curve type: `%s`", curveName)
-
-	case "RSA PRIVATE KEY":
-		rsaPrivateKey, err := x509.ParsePKCS1PrivateKey(pemDecoded.Bytes)
-		if err != nil {
-			return "", "", err
-		}
-		keyLength := rsaPrivateKey.N.BitLen()
-
-		keyType, ok := supportedRSAKeys[keyLength]
-		if ok {
-			return keyType, digestAlgorithm[keyType], nil
-		}
-		return "", "", fmt.Errorf("unsupported RSA keylength: %d", keyLength)
-
-	case "PRIVATE KEY":
-		key, _ := x509.ParsePKCS8PrivateKey(pemDecoded.Bytes)
-
-		switch key := key.(type) {
-		case *ecdsa.PrivateKey:
-			curveName := key.PublicKey.Curve.Params().Name
-			keyType, ok := supportedECDSAKeys[curveName]
-
-			if ok {
-				return keyType, digestAlgorithm[keyType], nil
-			}
+		if !ok {
 			return "", "", fmt.Errorf("unsupported curve type: `%s`", curveName)
+		}
 
-		case *rsa.PrivateKey:
-			keyLength := key.N.BitLen()
-			keyType, ok := supportedRSAKeys[keyLength]
+	case *rsa.PrivateKey:
+		keyLength := key.N.BitLen()
+		keyType, ok = supportedRSAKeys[keyLength]
 
-			if ok {
-				return keyType, digestAlgorithm[keyType], nil
-			}
+		if !ok {
 			return "", "", fmt.Errorf("unsupported RSA keylength: %d", keyLength)
 		}
 	}
-	return "", "", fmt.Errorf("your key is incompatible with Notary project signature specification")
+	parsedKey, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
+	if err != nil {
+		return "", "", err
+	}
+	ephemeralAESKey := make([]byte, 32)
+	_, err = rand.Read(ephemeralAESKey)
+	if err != nil {
+		return "", "", err
+	}
+	wrapKWP, err := subtle.NewKWP(ephemeralAESKey)
+	if err != nil {
+		return "", "", err
+	}
+	wrappedTargetKey, err := wrapKWP.Wrap(pkcs8PrivateKey)
+	if err != nil {
+		return "", "", err
+	}
+	wrappedAESKey, err := rsa.EncryptOAEP(
+		sha256.New(),
+		rand.Reader,
+		parsedKey.(*rsa.PublicKey),
+		ephemeralAESKey,
+		[]byte{},
+	)
+	if err != nil {
+		return "", "", err
+	}
+	combinedCiphertext := append(wrappedAESKey, wrappedTargetKey...)
+	base64Ciphertext := base64.StdEncoding.EncodeToString(combinedCiphertext)
+	return base64Ciphertext, keyType, nil
 }
 
-func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string, keyType string, hashFunction string) error {
+func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string, keyType string) error {
 	path := fmt.Sprintf("/transit/keys/%s/import", keyName)
 	req := map[string]interface{}{
 		"allow_plaintext_backup": false,
@@ -237,7 +183,7 @@ func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext st
 		"context":                "",
 		"derived":                false,
 		"exportable":             false,
-		"hashFunction":           hashFunction,
+		"hashFunction":           "SHA256",
 		"type":                   keyType,
 		"name":                   "keyName",
 	}
