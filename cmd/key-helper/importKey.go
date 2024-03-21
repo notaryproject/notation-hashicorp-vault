@@ -100,12 +100,13 @@ func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
 }
 
 func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, string, error) {
-	// Key types supported by Notary project specification
+	// Key mapping length to Vault/OpenBao names (supported by Notary project specification)
 	supportedRSAKeys := map[int]string{
 		2048: "rsa-2048",
 		3072: "rsa-3072",
 		4096: "rsa-4096",
 	}
+	// Key mapping curve name to Vault/OpenBao names (supported by Notary project specification)
 	supportedECDSAKeys := map[string]string{
 		"P-256": "ecdsa-p256",
 		"P-384": "ecdsa-p384",
