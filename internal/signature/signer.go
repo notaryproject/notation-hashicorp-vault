@@ -63,7 +63,7 @@ func Sign(ctx context.Context, req *proto.GenerateSignatureRequest) (*proto.Gene
 		}
 	}
 
-	// Map of Notation RSA-OAEP hash algorithms to Vault's transit engine /sign endpoint equivalent
+	// Notary to OpenBao/Vault hash algorithm naming conversion map
 	vaultHashAlgorithms := map[string]string{
 		"SHA-256": "sha2-256",
 		"SHA-384": "sha2-384",
