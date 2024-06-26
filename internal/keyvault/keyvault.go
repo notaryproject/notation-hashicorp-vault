@@ -5,10 +5,11 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	vault "github.com/hashicorp/vault/api"
-	"github.com/notaryproject/notation-hashicorp-vault/internal/crypto"
 	"os"
 	"strings"
+
+	vault "github.com/hashicorp/vault/api"
+	"github.com/notaryproject/notation-hashicorp-vault/internal/crypto"
 )
 
 type VaultClientWrapper struct {
@@ -52,7 +53,7 @@ func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.
 	return crypto.ParseCertificates(certBytes)
 }
 
-func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData string, signAlgorithm string) ([]byte, error) {
+func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData string, signAlgorithm string, hashAlgorithm string) ([]byte, error) {
 	// sign with transit SE
 	transitSignReq := map[string]interface{}{
 		"input":                encodedData,
@@ -60,6 +61,7 @@ func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData s
 		"prehashed":            true,
 		"salt_length":          "hash",
 		"signature_algorithm":  signAlgorithm,
+		"hash_algorithm":       hashAlgorithm,
 	}
 	path := "transit/sign/" + vw.keyID
 	resp, err := vw.vaultClient.Logical().WriteWithContext(ctx, path, transitSignReq)
