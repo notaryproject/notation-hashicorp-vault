@@ -15,10 +15,13 @@ import (
 type VaultClientWrapper struct {
 	vaultClient *vault.Client
 
-	keyID string
+	keyID             string
+	kvEngineName      string
+	transitEngineName string
+	transitKeyID      string
 }
 
-func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
+func NewVaultClientFromKeyID(id string, pluginConfig map[string]string) (*VaultClientWrapper, error) {
 	// read addr and token from environment variables
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if len(vaultAddr) < 1 {
@@ -33,15 +36,31 @@ func NewVaultClientFromKeyID(id string) (*VaultClientWrapper, error) {
 		return nil, err
 	}
 
+	transitName, ok := pluginConfig["transitName"]
+	if !ok {
+		transitName = "transit"
+	}
+	kvName, ok := pluginConfig["kvName"]
+	if !ok {
+		kvName = "secret"
+	}
+	transitKeyName, ok := pluginConfig["transitKeyName"]
+	if !ok {
+		transitKeyName = ""
+	}
+
 	return &VaultClientWrapper{
-		vaultClient: client,
-		keyID:       id,
+		vaultClient:       client,
+		keyID:             id,
+		kvEngineName:      kvName,
+		transitEngineName: transitName,
+		transitKeyID:      transitKeyName,
 	}, nil
 }
 
 func (vw *VaultClientWrapper) GetCertificateChain(ctx context.Context) ([]*x509.Certificate, error) {
 	// read a certChain
-	secret, err := vw.vaultClient.KVv2("secret").Get(ctx, vw.keyID)
+	secret, err := vw.vaultClient.KVv2(vw.kvEngineName).Get(ctx, vw.keyID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +82,7 @@ func (vw *VaultClientWrapper) SignWithTransit(ctx context.Context, encodedData s
 		"signature_algorithm":  signAlgorithm,
 		"hash_algorithm":       hashAlgorithm,
 	}
-	path := "transit/sign/" + vw.keyID
+	path := vw.transitEngineName + "/sign/" + vw.transitKeyID
 	resp, err := vw.vaultClient.Logical().WriteWithContext(ctx, path, transitSignReq)
 	if err != nil {
 		return nil, err

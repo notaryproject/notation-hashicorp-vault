@@ -23,7 +23,7 @@ func runDescribeKey(ctx context.Context, input io.Reader) (*proto.DescribeKeyRes
 	}
 
 	// get key spec for notation
-	keySpec, err := notationKeySpec(ctx, req.KeyID)
+	keySpec, err := notationKeySpec(ctx, req.KeyID, req.PluginConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -33,8 +33,8 @@ func runDescribeKey(ctx context.Context, input io.Reader) (*proto.DescribeKeyRes
 	}, nil
 }
 
-func notationKeySpec(ctx context.Context, keyID string) (proto.KeySpec, error) {
-	vaultClient, err := NewVaultClientFromKeyID(keyID)
+func notationKeySpec(ctx context.Context, keyID string, pluginConfig map[string]string) (proto.KeySpec, error) {
+	vaultClient, err := NewVaultClientFromKeyID(keyID, pluginConfig)
 	if err != nil {
 		return "", err
 	}
