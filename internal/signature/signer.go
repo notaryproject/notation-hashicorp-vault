@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+
 	"github.com/notaryproject/notation-go/plugin/proto"
 	"github.com/notaryproject/notation-hashicorp-vault/internal/keyvault"
 )
@@ -62,6 +63,14 @@ func Sign(ctx context.Context, req *proto.GenerateSignatureRequest) (*proto.Gene
 		}
 	}
 
+	// Notary to OpenBao/Vault hash algorithm naming conversion map
+	vaultHashAlgorithms := map[string]string{
+		"SHA-256": "sha2-256",
+		"SHA-384": "sha2-384",
+		"SHA-512": "sha2-512",
+	}
+	vaultHashAlgorithm := vaultHashAlgorithms[string(req.Hash)]
+
 	// compute hash for the payload
 	hashData, err := computeHash(keySpec.SignatureAlgorithm().Hash(), req.Payload)
 	if err != nil {
@@ -71,7 +80,7 @@ func Sign(ctx context.Context, req *proto.GenerateSignatureRequest) (*proto.Gene
 		}
 	}
 	encodedHash := base64.StdEncoding.EncodeToString(hashData)
-	sigBytes, err := vaultClient.SignWithTransit(ctx, encodedHash, signAlgorithm)
+	sigBytes, err := vaultClient.SignWithTransit(ctx, encodedHash, signAlgorithm, vaultHashAlgorithm)
 	if err != nil {
 		return nil, &proto.RequestError{
 			Code: proto.ErrorCodeGeneric,

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -51,11 +52,11 @@ func importKeyCommand() *cobra.Command {
 				return err
 			}
 			fmt.Println("Successfully got wrapping key")
-			ciphertext, err := wrapPrivateKey(wrappingKey, keyPath)
+			ciphertext, keyType, err := wrapPrivateKey(wrappingKey, keyPath)
 			if err != nil {
 				return err
 			}
-			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName); err != nil {
+			if err := importKeyToTransit(ctx, vaultClient, ciphertext, keyName, keyType); err != nil {
 				return err
 			}
 			fmt.Println("Successfully imported key to transit")
@@ -98,32 +99,54 @@ func getWrappingKey(ctx context.Context, client *vault.Client) (string, error) {
 	return key, nil
 }
 
-func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
+func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, string, error) {
+	// Key mapping length to Vault/OpenBao names (supported by Notary project specification)
+	supportedRSAKeys := map[int]string{
+		2048: "rsa-2048",
+		3072: "rsa-3072",
+		4096: "rsa-4096",
+	}
+
 	keyBlock, _ := pem.Decode([]byte(wrappingKey))
 	privateKey, err := notationx509.ReadPrivateKeyFile(privateKeyPath)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	pkcs8PrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+
+	var keyType string
+	var ok bool
+	switch key := privateKey.(type) {
+	case *ecdsa.PrivateKey:
+		return "", "", fmt.Errorf("ECDSA is not implemented yet")
+
+	case *rsa.PrivateKey:
+		keyLength := key.N.BitLen()
+		keyType, ok = supportedRSAKeys[keyLength]
+
+		if !ok {
+			return "", "", fmt.Errorf("unsupported RSA keylength: %d", keyLength)
+		}
 	}
 	parsedKey, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	ephemeralAESKey := make([]byte, 32)
 	_, err = rand.Read(ephemeralAESKey)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	wrapKWP, err := subtle.NewKWP(ephemeralAESKey)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	wrappedTargetKey, err := wrapKWP.Wrap(pkcs8PrivateKey)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	wrappedAESKey, err := rsa.EncryptOAEP(
 		sha256.New(),
@@ -133,14 +156,14 @@ func wrapPrivateKey(wrappingKey string, privateKeyPath string) (string, error) {
 		[]byte{},
 	)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	combinedCiphertext := append(wrappedAESKey, wrappedTargetKey...)
 	base64Ciphertext := base64.StdEncoding.EncodeToString(combinedCiphertext)
-	return base64Ciphertext, nil
+	return base64Ciphertext, keyType, nil
 }
 
-func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string) error {
+func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext string, keyName string, keyType string) error {
 	path := fmt.Sprintf("/transit/keys/%s/import", keyName)
 	req := map[string]interface{}{
 		"allow_plaintext_backup": false,
@@ -151,7 +174,7 @@ func importKeyToTransit(ctx context.Context, client *vault.Client, ciphertext st
 		"derived":                false,
 		"exportable":             false,
 		"hashFunction":           "SHA256",
-		"type":                   "rsa-2048",
+		"type":                   keyType,
 		"name":                   "keyName",
 	}
 	_, err := client.Logical().WriteWithContext(ctx, path, req)
