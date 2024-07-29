@@ -140,3 +140,28 @@ Note: the `--id` should be identical to your `--key_name` in the previous step.
     ```bash
     ./notation verify <myRegistry>/<myRepo>@<digest> -v
     ```
+
+## hc-vault plugin options (passed as `notation sign (...)` command options
+|Option name    |Usage                                   |Description                                                           |
+|---------------|----------------------------------------|-----------------------------------------------------------------------|
+|id             |`--id <keyName>`                        |(required) default name for transit key and kv key                     |
+|kvName         |`--plugin-config kvName=<name>`         |(default: `secret`) custom name for key-value(KVv2) secret engine mount|
+|transitName    |`--plugin-config transitName=<name>`    |(default: `transit`) custom name for transit secret engine mount       |
+|transitKeyName |`--plugin-config transitKeyName=<name>` |custom name for transit key (overrides `id`)                           |
+
+## key-helper import options
+notation-hashicorp-vault % ./cmd/key-helper/key-helper import --help
+import private key to Vault Transit secrets engine and certificates to Vault KV secrets engine
+
+Usage:
+  key-helper import --key_path <path_to_private key file> --cert_path <path_to__certificate_chain_file> --key_name <HashiCorp_Vault_key_name> [flags]
+
+Flags:
+      --cert_path string          absolute path to the certificate chain file
+  -h, --help                      help for import
+      --key_name string           name of the key
+      --key_path string           absolute path to the private key file
+      --kv_name string            name of the KVv2 secret engine mount (default "secret")
+      --transit_key_name string   name of the key in transit engine
+      --transit_name string       name of the transit engine mount (default "transit")
+notation-hashicorp-vault %

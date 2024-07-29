@@ -21,7 +21,7 @@ func Sign(ctx context.Context, req *proto.GenerateSignatureRequest) (*proto.Gene
 		}
 	}
 
-	vaultClient, err := keyvault.NewVaultClientFromKeyID(req.KeyID)
+	vaultClient, err := keyvault.NewVaultClientFromKeyID(req.KeyID, req.PluginConfig)
 	if err != nil {
 		return nil, &proto.RequestError{
 			Code: proto.ErrorCodeGeneric,
