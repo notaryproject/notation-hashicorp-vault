@@ -46,7 +46,7 @@ func NewVaultClientFromKeyID(id string, pluginConfig map[string]string) (*VaultC
 	}
 	transitKeyName, ok := pluginConfig["transitKeyName"]
 	if !ok {
-		transitKeyName = ""
+		transitKeyName = id
 	}
 
 	return &VaultClientWrapper{
